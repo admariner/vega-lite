@@ -48,7 +48,7 @@ import {initLayoutSize} from './layoutsize/init';
 import {parseUnitLayoutSize} from './layoutsize/parse';
 import {LegendInternalIndex} from './legend/component';
 import {defaultFilled, initMarkdef} from './mark/init';
-import {parseMarkGroups} from './mark/mark';
+import {parseMarkGroupsAndAvoidMarks} from './mark/mark';
 import {isLayerModel, Model, ModelWithField} from './model';
 import {ScaleIndex} from './scale/component';
 import {
@@ -78,6 +78,8 @@ export class UnitModel extends ModelWithField {
 
   public readonly selection: SelectionParameter[] = [];
   public children: Model[] = [];
+
+  private avoidMarks: string[];
 
   constructor(
     spec: NormalizedUnitSpec,
@@ -234,7 +236,9 @@ export class UnitModel extends ModelWithField {
   }
 
   public parseMarkGroup() {
-    this.component.mark = parseMarkGroups(this);
+    const {markGroup, avoidMarks} = parseMarkGroupsAndAvoidMarks(this);
+    this.component.mark = markGroup;
+    this.avoidMarks = avoidMarks;
   }
 
   public parseAxesAndHeaders() {
@@ -276,6 +280,20 @@ export class UnitModel extends ModelWithField {
 
   protected getMapping() {
     return this.encoding;
+  }
+
+  public getMarkNames(): string[] {
+    return (this.component.mark ?? []).map(m => m.name).filter(name => name);
+  }
+
+  public addToAvoidMarks(names: string[], level: number) {
+    if (this.encoding.label && this.encoding.label.avoid !== 'mark') {
+      names.forEach(name => {
+        if (!this.avoidMarks.includes(name) && (this.encoding.label.avoid !== 'layer' || level === 0)) {
+          this.avoidMarks.push(name);
+        }
+      });
+    }
   }
 
   public get mark(): Mark {

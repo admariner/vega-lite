@@ -36,7 +36,13 @@ function getPointOverlay(
   markConfig: LineConfig<ExprRef | SignalRef> = {},
   encoding: Encoding<string>
 ): MarkConfig<ExprRef | SignalRef> {
-  if (markDef.point === 'transparent' || (!markDef.point && encoding.label)) {
+  if (
+    markDef.point === 'transparent' ||
+    (markDef.type === 'line' &&
+      !markDef.point &&
+      encoding.label &&
+      pathGroupingFields(markDef.type, encoding).length <= 0)
+  ) {
     return {opacity: 0};
   } else if (markDef.point) {
     // truthy : true or object

@@ -73,6 +73,12 @@ export class LayerModel extends Model {
     for (const child of this.children) {
       child.parseMarkGroup();
     }
+
+    const markNames: string[] = [];
+    this.children.forEach((child: UnitModel | LayerModel) => {
+      child.addToAvoidMarks(markNames, 0);
+      markNames.push(...child.getMarkNames());
+    });
   }
 
   public parseAxesAndHeaders() {
@@ -132,5 +138,13 @@ export class LayerModel extends Model {
     return this.children.reduce((legends, child) => {
       return legends.concat(child.assembleLegends());
     }, assembleLegends(this));
+  }
+
+  public getMarkNames(): string[] {
+    return this.children.flatMap((child: UnitModel | LayerModel) => child.getMarkNames());
+  }
+
+  public addToAvoidMarks(names: string[], level: number) {
+    this.children.forEach((child: UnitModel | LayerModel) => child.addToAvoidMarks(names, level + 1));
   }
 }

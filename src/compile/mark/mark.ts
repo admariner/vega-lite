@@ -40,7 +40,7 @@ const markCompiler: Record<Mark, MarkCompiler> = {
   trail
 };
 
-export function parseMarkGroups(model: UnitModel): any[] {
+export function parseMarkGroupsAndAvoidMarks(model: UnitModel): {markGroup: any[]; avoidMarks: string[]} {
   if (contains([LINE, AREA, TRAIL], model.mark)) {
     const details = pathGroupingFields(model.mark, model.encoding);
     if (details.length > 0) {
@@ -56,7 +56,8 @@ export function parseMarkGroups(model: UnitModel): any[] {
     }
   }
 
-  return getMarkGroupWithLabel(model);
+  const {markGroup, avoidMarks} = getLabel(model, model.getName('marks'));
+  return {markGroup: [...getMarkGroup(model), ...markGroup], avoidMarks};
 }
 
 const FACETED_PATH_PREFIX = 'faceted_path_';
@@ -64,7 +65,8 @@ const FACETED_PATH_PREFIX = 'faceted_path_';
 function getPathGroups(model: UnitModel, details: string[]) {
   // TODO: for non-stacked plot, map order to zindex. (Maybe rename order for layer to zindex?)
 
-  return [
+  const {markGroup: label, avoidMarks} = getLabel(model, model.getName('pathgroup'));
+  const markGroup = [
     {
       name: model.getName('pathgroup'),
       type: 'group',
@@ -84,8 +86,10 @@ function getPathGroups(model: UnitModel, details: string[]) {
       // With subfacet for line/area group, need to use faceted data from above.
       marks: getMarkGroup(model, {fromPrefix: FACETED_PATH_PREFIX})
     },
-    ...(model.encoding.label ? getLabel(model, model.getName('pathgroup')) : [])
+    ...label
   ];
+
+  return {markGroup, avoidMarks};
 }
 
 const STACK_GROUP_PREFIX = 'stack_group_';
@@ -216,9 +220,11 @@ function getGroupsForStackedBarWithCornerRadius(model: UnitModel) {
     groupUpdate.strokeOffset = {value: 0};
   }
 
-  return [
+  const {markGroup: label, avoidMarks} = getLabel(model, model.getName('marks'));
+  const markGroup = [
     {
       type: 'group',
+      name: model.getName('stackgroup'),
       from: {
         facet: {
           data: model.requestDataName(DataSourceType.Main),
@@ -242,11 +248,13 @@ function getGroupsForStackedBarWithCornerRadius(model: UnitModel) {
         {
           type: 'group',
           encode: {update: innerGroupUpdate},
-          marks: [mark, ...(model.encoding.label ? getLabel(model, model.getName('marks')) : [])]
+          marks: [mark, ...label]
         }
       ]
     }
   ];
+
+  return {markGroup, avoidMarks};
 }
 
 export function getSort(model: UnitModel): VgCompare {
@@ -306,10 +314,6 @@ export function getSort(model: UnitModel): VgCompare {
   return undefined;
 }
 
-function getMarkGroupWithLabel(model: UnitModel, opt: {fromPrefix: string} = {fromPrefix: ''}) {
-  return [...getMarkGroup(model, opt), ...(model.encoding.label ? getLabel(model, model.getName('marks')) : [])];
-}
-
 function getMarkGroup(model: UnitModel, opt: {fromPrefix: string} = {fromPrefix: ''}) {
   const {mark, markDef, encoding, config} = model;
 
@@ -347,7 +351,11 @@ function getMarkGroup(model: UnitModel, opt: {fromPrefix: string} = {fromPrefix:
   ];
 }
 
-function getLabel(model: UnitModel, data: string) {
+function getLabel(model: UnitModel, data: string): {markGroup: any[]; avoidMarks: string[]} {
+  if (!model.encoding.label) {
+    return {markGroup: [], avoidMarks: []};
+  }
+
   const {label} = model.encoding;
   const {position, avoid, mark, method, lineAnchor, ...textEncoding} = label;
 
@@ -372,9 +380,10 @@ function getLabel(model: UnitModel, data: string) {
   const interactive = interactiveFlag(model);
   const aria = getMarkPropOrConfig('aria', markDef, config);
 
-  const labelTransform: LabelTransform = getLabelTransform(label, model);
+  const labelTransform = getLabelTransform(label, model);
+  const avoidMarks: string[] = [];
 
-  return [
+  const markGroup = [
     {
       name: model.getName('marks_label'),
       type: markCompiler.text.vgMark,
@@ -404,9 +413,11 @@ function getLabel(model: UnitModel, data: string) {
           })
         }
       },
-      transform: [labelTransform]
+      transform: [{...labelTransform, avoidMarks}]
     }
   ];
+
+  return {markGroup, avoidMarks};
 }
 
 function getLabelTransform(
@@ -422,8 +433,7 @@ function getLabelTransform(
   const common: LabelTransform = {
     type: 'label',
     size: {signal: '[width, height]'},
-    padding
-    // TODO: avoidMarks: link the names from avoid to the compiled mark names
+    ...(padding === undefined ? {} : {padding})
   };
 
   switch (model.mark) {
