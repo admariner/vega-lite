@@ -1,5 +1,6 @@
+import {LabelTransform} from 'vega';
 import {isArray} from 'vega-util';
-import {FieldRefOption, isFieldDef, isValueDef, vgField} from '../../channeldef';
+import {FieldRefOption, isFieldDef, isValueDef, LabelDef, vgField} from '../../channeldef';
 import {DataSourceType} from '../../data';
 import {isAggregate, pathGroupingFields} from '../../encoding';
 import {AREA, BAR, isPathMark, LINE, Mark, TRAIL} from '../../mark';
@@ -20,6 +21,7 @@ import {rect} from './rect';
 import {rule} from './rule';
 import {text} from './text';
 import {tick} from './tick';
+import {baseEncodeEntry as encodeBaseEncodeEntry, text as encodeText, nonPosition as encodeNonPosition} from './encode';
 
 const markCompiler: Record<Mark, MarkCompiler> = {
   arc,
@@ -54,7 +56,7 @@ export function parseMarkGroups(model: UnitModel): any[] {
     }
   }
 
-  return getMarkGroup(model);
+  return getMarkGroupWithLabel(model);
 }
 
 const FACETED_PATH_PREFIX = 'faceted_path_';
@@ -81,7 +83,8 @@ function getPathGroups(model: UnitModel, details: string[]) {
       },
       // With subfacet for line/area group, need to use faceted data from above.
       marks: getMarkGroup(model, {fromPrefix: FACETED_PATH_PREFIX})
-    }
+    },
+    ...(model.encoding.label ? getLabel(model, model.getName('pathgroup')) : [])
   ];
 }
 
@@ -239,7 +242,7 @@ function getGroupsForStackedBarWithCornerRadius(model: UnitModel) {
         {
           type: 'group',
           encode: {update: innerGroupUpdate},
-          marks: [mark]
+          marks: [mark, ...(model.encoding.label ? getLabel(model, model.getName('marks')) : [])]
         }
       ]
     }
@@ -303,6 +306,10 @@ export function getSort(model: UnitModel): VgCompare {
   return undefined;
 }
 
+function getMarkGroupWithLabel(model: UnitModel, opt: {fromPrefix: string} = {fromPrefix: ''}) {
+  return [...getMarkGroup(model, opt), ...(model.encoding.label ? getLabel(model, model.getName('marks')) : [])];
+}
+
 function getMarkGroup(model: UnitModel, opt: {fromPrefix: string} = {fromPrefix: ''}) {
   const {mark, markDef, encoding, config} = model;
 
@@ -338,6 +345,132 @@ function getMarkGroup(model: UnitModel, opt: {fromPrefix: string} = {fromPrefix:
         : {})
     }
   ];
+}
+
+function getLabel(model: UnitModel, data: string) {
+  const {label} = model.encoding;
+  const {position, avoid, mark, method, lineAnchor, ...textEncoding} = label;
+
+  const textModel = new UnitModel(
+    {
+      data: null,
+      mark: {type: 'text', ...(mark ?? {})},
+      encoding: {text: textEncoding}
+    },
+    null,
+    '',
+    undefined,
+    model.config
+  );
+  textModel.parse();
+
+  const {markDef, encoding, config} = textModel;
+  const clip = getFirstDefined(markDef.clip, scaleClip(model), projectionClip(model));
+  const style = getStyles(markDef);
+  const key = encoding.key;
+  const sort = getSort(model);
+  const interactive = interactiveFlag(model);
+  const aria = getMarkPropOrConfig('aria', markDef, config);
+
+  const labelTransform: LabelTransform = getLabelTransform(label, model);
+
+  return [
+    {
+      name: model.getName('marks_label'),
+      type: markCompiler.text.vgMark,
+      ...(clip ? {clip: true} : {}),
+      ...(style ? {style} : {}),
+      ...(key ? {key: key.field} : {}),
+      ...(sort ? {sort} : {}),
+      ...(interactive ? interactive : {}),
+      ...(aria === false ? {aria} : {}),
+      from: {data},
+      encode: {
+        update: {
+          ...omit(
+            encodeBaseEncodeEntry(textModel, {
+              align: 'ignore',
+              baseline: 'ignore',
+              color: 'include',
+              size: 'ignore',
+              orient: 'ignore',
+              theta: 'ignore'
+            }),
+            ['x', 'y', 'angle', 'radius', 'theta']
+          ),
+          ...encodeText(textModel, 'text', 'datum.datum'),
+          ...encodeNonPosition('size', textModel, {
+            vgChannel: 'fontSize' // VL's text size is fontSize
+          })
+        }
+      },
+      transform: [labelTransform]
+    }
+  ];
+}
+
+function getLabelTransform(
+  {position, method, padding, lineAnchor}: LabelDef<string>,
+  model: UnitModel
+): LabelTransform {
+  const anchor = position && position.map(p => p.anchor);
+  const offset = position && position.map(p => p.offset);
+
+  lineAnchor = lineAnchor ?? 'end';
+  method = method ?? 'reduced-search';
+
+  const common: LabelTransform = {
+    type: 'label',
+    size: {signal: '[width, height]'},
+    padding
+    // TODO: avoidMarks: link the names from avoid to the compiled mark names
+  };
+
+  switch (model.mark) {
+    case 'area':
+      // TODO: should we set avoidBaseMark to false?
+      // TODO: remove this ts-ignore after vega-typings in vega is fixed
+      // @ts-ignore
+      return {...common, method};
+    case 'bar':
+      return {
+        ...common,
+        ...(position
+          ? {anchor, offset}
+          : {
+              anchor: model.markDef.orient === 'horizontal' ? ['right', 'right'] : ['top', 'top'],
+              offset: [2, -2]
+            })
+      };
+    case 'line':
+    case 'trail': {
+      const anchorDirection = lineAnchor === 'begin' ? 'left' : 'right';
+      return {
+        ...common,
+        lineAnchor,
+        ...(position
+          ? {anchor, offset}
+          : {
+              anchor: ['top-', '', 'bottom-'].map(a => a + anchorDirection),
+              offset: [2, 2, 2]
+            }),
+        ...(padding === undefined ? {padding: 50} : {})
+      };
+    }
+    case 'circle':
+    case 'point':
+    case 'square':
+      return {
+        ...common,
+        anchor: ['top-right', 'top', 'top-left', 'left', 'bottom-left', 'bottom', 'bottom-right', 'middle'],
+        // TODO: offset should depends on the size of mark
+        offset: [2, 2, 2, 2, 2, 2, 2, 2, 2]
+      };
+    case 'rect':
+      return {...common, anchor: ['middle'], offset: [0]};
+    default:
+      throw new Error('label encoding does not support ' + model.mark);
+  }
 }
 
 /**

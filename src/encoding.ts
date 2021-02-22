@@ -40,7 +40,8 @@ import {
   X2,
   Y,
   Y2,
-  Channel
+  Channel,
+  LABEL
 } from './channel';
 import {
   binRequiresRange,
@@ -59,6 +60,7 @@ import {
   isFieldDef,
   isTypedFieldDef,
   isValueDef,
+  LabelDef,
   LatLongDef,
   NumericArrayMarkPropDef,
   NumericMarkPropDef,
@@ -272,6 +274,8 @@ export interface Encoding<F extends Field> {
    * Text of the `text` mark.
    */
   text?: TextDef<F>;
+
+  label?: LabelDef<F>;
 
   /**
    * The tooltip text to show upon mouse hover. Specifying `tooltip` encoding overrides [the `tooltip` property in the mark definition](https://vega.github.io/vega-lite/docs/mark.html#mark-def).
@@ -653,8 +657,9 @@ export function pathGroupingFields(mark: Mark, encoding: Encoding<string>): stri
       case LONGITUDE2:
       // TODO: case 'cursor':
 
-      // text, shape, shouldn't be a part of line/trail/area [falls through]
+      // text, label, shape, shouldn't be a part of line/trail/area [falls through]
       case TEXT:
+      case LABEL: // TODO: line/trail/area should support labeling later
       case SHAPE:
       case ANGLE:
       // falls through

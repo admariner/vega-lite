@@ -1,7 +1,7 @@
 import {SignalRef} from 'vega';
 import {isObject} from 'vega-util';
 import {Config} from '../config';
-import {Encoding, normalizeEncoding} from '../encoding';
+import {Encoding, normalizeEncoding, pathGroupingFields} from '../encoding';
 import {ExprRef} from '../expr';
 import {AreaConfig, isMarkDef, LineConfig, Mark, MarkConfig, MarkDef} from '../mark';
 import {GenericUnitSpec, NormalizedUnitSpec} from '../spec';
@@ -36,7 +36,7 @@ function getPointOverlay(
   markConfig: LineConfig<ExprRef | SignalRef> = {},
   encoding: Encoding<string>
 ): MarkConfig<ExprRef | SignalRef> {
-  if (markDef.point === 'transparent') {
+  if (markDef.point === 'transparent' || (!markDef.point && encoding.label)) {
     return {opacity: 0};
   } else if (markDef.point) {
     // truthy : true or object
@@ -111,6 +111,8 @@ export class PathOverlayNormalizer implements NonFacetUnitNormalizer<UnitSpecWit
     const pointOverlay = getPointOverlay(markDef, config[markDef.type], encoding);
     const lineOverlay = markDef.type === 'area' && getLineOverlay(markDef, config[markDef.type]);
 
+    const hasDetails = pathGroupingFields(markDef.type, spec.encoding).length > 0;
+
     const layer: NormalizedUnitSpec[] = [
       {
         ...(params ? {params} : {}),
@@ -122,7 +124,8 @@ export class PathOverlayNormalizer implements NonFacetUnitNormalizer<UnitSpecWit
           ...markDef
         }),
         // drop shape from encoding as this might be used to trigger point overlay
-        encoding: omit(encoding, ['shape'])
+        // drop label from encoding when not having detail (connected scatter plot)
+        encoding: omit(encoding, ['shape', ...(hasDetails ? [] : ['label' as const])])
       }
     ];
 
@@ -151,7 +154,8 @@ export class PathOverlayNormalizer implements NonFacetUnitNormalizer<UnitSpecWit
           ...pick(markDef, ['clip', 'interpolate', 'tension', 'tooltip']),
           ...lineOverlay
         },
-        encoding: overlayEncoding
+        // drop label from encoding as only area is labeled
+        encoding: omit(overlayEncoding, ['label'])
       });
     }
     if (pointOverlay) {
@@ -164,7 +168,8 @@ export class PathOverlayNormalizer implements NonFacetUnitNormalizer<UnitSpecWit
           ...pick(markDef, ['clip', 'tooltip']),
           ...pointOverlay
         },
-        encoding: overlayEncoding
+        // drop label from encoding when having detail (grouped line chart)
+        encoding: hasDetails ? omit(overlayEncoding, ['label']) : overlayEncoding
       });
     }
 
