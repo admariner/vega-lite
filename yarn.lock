@@ -1876,9 +1876,9 @@ ajv@^6.10.0, ajv@^6.12.3, ajv@^6.12.4:
     uri-js "^4.2.2"
 
 ajv@^8.0.0, ajv@^8.0.1, ajv@^8.4.0:
-  version "8.6.0"
-  resolved "https://registry.yarnpkg.com/ajv/-/ajv-8.6.0.tgz#60cc45d9c46a477d80d92c48076d972c342e5720"
-  integrity sha512-cnUG4NSBiM4YFBxgZIj/In3/6KX+rQ2l2YPRVcvAMQGWEPKuXoPIhxzwqh31jA3IPbI4qEOp/5ILI4ynioXsGQ==
+  version "8.6.1"
+  resolved "https://registry.yarnpkg.com/ajv/-/ajv-8.6.1.tgz#ae65764bf1edde8cd861281cda5057852364a295"
+  integrity sha512-42VLtQUOLefAvKFAQIxIZDaThq6om/PrfP0CYk3/vn+y4BMNkKnbli8ON2QCiHov4KkzOSJ/xSoBJdayiiYvVQ==
   dependencies:
     fast-deep-equal "^3.1.1"
     json-schema-traverse "^1.0.0"
@@ -8248,6 +8248,13 @@ vega-tooltip@^0.25.1:
   version "0.25.1"
   resolved "https://registry.yarnpkg.com/vega-tooltip/-/vega-tooltip-0.25.1.tgz#cb7e438438649eb46896e7bee6f54e25d25b3c09"
   integrity sha512-ugGwGi2/p3OpB8N15xieuzP8DyV5DreqMWcmJ9zpWT8GlkyKtef4dGRXnvHeHQ+iJFmWrq4oZJ+kLTrdiECjAg==
+  dependencies:
+    vega-util "^1.16.0"
+
+vega-tooltip@^0.26.0:
+  version "0.26.0"
+  resolved "https://registry.yarnpkg.com/vega-tooltip/-/vega-tooltip-0.26.0.tgz#f2cad2e6055fa1e0e40640123d75a9d49669fa07"
+  integrity sha512-8touiv+6ctO+Ux37wqaLOaW1rWKTkoGTZIGCxIWFsQVBfnNWWbOAYKAB0ejLAS5GjMStKTU3L3bKI+E8g8yXUA==
   dependencies:
     vega-util "^1.16.0"
 
